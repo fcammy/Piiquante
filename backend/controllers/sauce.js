@@ -20,7 +20,7 @@ exports.createSauce = (req, res) => {
   sauce
     .save()
     .then(() => res.status(201).json({ message: "Sauce added to database." }))
-    .catch((error) => res.status(400).json({ error }));
+    .catch((error) => res.status(403).json({ error }));
 };
 
 // Function to get all the sauces
@@ -88,7 +88,7 @@ exports.updateSauce = (req, res) => {
       });
     })
     .catch((error) => {
-      res.status(400).json({
+      res.status(403).json({
         error: error,
       });
     });

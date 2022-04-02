@@ -2,12 +2,19 @@ const User = require("../models/user");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
+const {signUpValidation} = require("../validation");
+
+
 
 dotenv.config();
 
 // Creating a signup controller
 
 exports.signup = (req, res) => {
+
+  const {error} = signUpValidation(req.body);
+    if(error) return res.status(400).send(error.details[0].message);
+
   bcrypt.hash(req.body.password, 10).then((hash) => {
     const user = new User({
       email: req.body.email,
