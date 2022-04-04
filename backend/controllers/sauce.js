@@ -1,12 +1,21 @@
 const Sauce = require("../models/sauce");
-
 const fs = require("fs");
+
+const { validateSauce } = require("../sauceValidation");
 
 // function to create sauces
 
 exports.createSauce = (req, res) => {
+
+  const { error } = validateSauce(req.body);
+
+  if (error) {
+    return res.status(400).send(error.details[0].message);
+  }
+
   const data = JSON.parse(req.body.sauce);
   const url = req.protocol + "://" + req.get("host");
+
   const sauce = new Sauce({
     name: data.name,
     manufacturer: data.manufacturer,

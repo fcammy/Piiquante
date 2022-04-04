@@ -2,18 +2,22 @@ const User = require("../models/user");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
-const {signUpValidation} = require("../validation");
 
-
+const { signupValidation, loginValidation} = require("../validation");
 
 dotenv.config();
 
 // Creating a signup controller
 
-exports.signup = (req, res) => {
+exports.signup =  (req, res, next) => {
 
-  const {error} = signUpValidation(req.body);
-    if(error) return res.status(400).send(error.details[0].message);
+  const { error } = signupValidation(req.body);
+
+  if (error) {
+
+    return res.status(400).send(error.details[0].message);
+     
+  }
 
   bcrypt.hash(req.body.password, 10).then((hash) => {
     const user = new User({
@@ -38,7 +42,16 @@ exports.signup = (req, res) => {
 
 // Creating a login controller
 
-exports.login = (req, res, next) => {
+exports.login =  (req, res, next) => {
+
+  const { error } = loginValidation(req.body);
+
+  if (error) {
+
+    return res.status(400).send(error.details[0].message);
+     
+  }
+    
   User.findOne({ email: req.body.email })
     .then((user) => {
       if (!user) {
