@@ -2,7 +2,7 @@ const Joi = require('joi');
 
 
 const validateSauce = (data) => {
-
+    
     const schema = Joi.object().keys({
 
         name: Joi.string().required(),
@@ -10,9 +10,11 @@ const validateSauce = (data) => {
         description: Joi.string().max(50).required(),
         mainPepper: Joi.string().required(),
         heat: Joi.number().required(),
+        userId: Joi.string().required(),
 
     });
     return schema.validate(data);
 }
 
 module.exports.validateSauce = validateSauce;
+

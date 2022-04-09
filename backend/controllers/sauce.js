@@ -1,20 +1,27 @@
 const Sauce = require("../models/sauce");
 const fs = require("fs");
-
+//const ObjectID = require("mongodb").ObjectId;
 const { validateSauce } = require("../sauceValidation");
 
 // function to create sauces
 
 exports.createSauce = (req, res) => {
 
-  const { error } = validateSauce(req.body);
+  // Parsing the request body
+
+  const data = JSON.parse(req.body.sauce);
+
+  // Joi validation
+
+  const { error } = validateSauce(data);
 
   if (error) {
     return res.status(400).send(error.details[0].message);
   }
 
-  const data = JSON.parse(req.body.sauce);
   const url = req.protocol + "://" + req.get("host");
+
+  // Creating the sauce
 
   const sauce = new Sauce({
     name: data.name,
@@ -25,20 +32,35 @@ exports.createSauce = (req, res) => {
     heat: data.heat,
     likes: 0,
     dislikes: 0,
+    userId: req.auth.userId,
   });
   sauce
     .save()
-    .then(() => res.status(201).json({ message: "Sauce added to database." }))
-    .catch((error) => res.status(403).json({ error }));
+    .then(() =>
+      res.status(201).json({
+        message: "Sauce added to database.",
+      })
+    )
+    .catch((error) =>
+      res.status(403).json({
+        error,
+      })
+    );
 };
 
 // Function to get all the sauces
+
 exports.getAllSauces = (req, res) => {
+
+  // Using the find() method to get all the sauces
   Sauce.find()
 
+  // Sending a response with the sauces
     .then((sauces) => {
       res.status(200).json(sauces);
     })
+
+    // Sending an error if the sauces are not found
     .catch((error) => {
       res.status(400).json({
         error: error,
@@ -49,7 +71,11 @@ exports.getAllSauces = (req, res) => {
 // Function to get a sauce by id
 
 exports.getOneSauce = (req, res) => {
-  Sauce.findOne({ _id: req.params.id })
+
+  // Using the findOne() method to get a sauce by id
+  Sauce.findOne({
+    _id: req.params.id,
+  })
 
     .then((sauce) => {
       res.status(200).json(sauce);
@@ -61,12 +87,20 @@ exports.getOneSauce = (req, res) => {
     });
 };
 
+
 // Function to update a sauce
+
 exports.updateSauce = (req, res) => {
-  let sauce = new Sauce({ _id: req.params.id });
+
+  // Declaring the variables
+  let sauce = new Sauce({
+    _id: req.params.id,
+  });
   if (req.file) {
     const url = req.protocol + "://" + req.get("host");
     req.body.sauce = JSON.parse(req.body.sauce);
+    
+    // Declaring the update object body
 
     sauce = {
       _id: req.params.id,
@@ -79,6 +113,8 @@ exports.updateSauce = (req, res) => {
       userId: req.body.sauce.userId,
     };
   } else {
+
+
     sauce = {
       _id: req.params.id,
       name: req.body.name,
@@ -90,7 +126,13 @@ exports.updateSauce = (req, res) => {
       userId: req.body.userId,
     };
   }
-  Sauce.updateOne({ _id: req.params.id }, sauce)
+
+  Sauce.updateOne(
+    {
+      _id: req.params.id,
+    },
+    sauce
+  )
     .then(() => {
       res.status(201).json({
         message: "Sauce updated !",
@@ -105,72 +147,153 @@ exports.updateSauce = (req, res) => {
 
 // Function to delete a sauce
 
-exports.deleteSauce = (req, res) => {
-  Sauce.findOne({ _id: req.params.id }).then((sauce) => {
-    if (!sauce) {
-      res.status(404).json({
-        error: new Error("No Sauce ! "),
+exports.deleteSauce = async (req, res) => {
+  
+  // Using the try catch block to handle the error
+
+  try {
+    const sauce = await Sauce.findOne({
+      _id: req.params.id,
+    });
+
+    // If the sauce is not found
+    if (!sauce) throw new Error("Sauce not found");
+
+    // If the user is not the owner of the sauce
+
+    if (!sauce.userId.equals(req.auth.userId))
+      throw new Error("Unauthorized request !");
+
+    // Deleting the sauce
+
+    const filename = sauce.imageUrl.split("/images/")[1];
+    fs.unlink(`images/${filename}`, async () => {
+      await Sauce.deleteOne({
+        _id: req.params.id,
       });
-    }
-    if (sauce.userId !== req.auth.userId) {
-      res.status(401).json({
-        error: new Error("Unauthorized request ! "),
+
+      res.status(200).json({
+        message: "Sauce Deleted !",
       });
-    }
-  });
-  Sauce.findOne({ _id: req.params.id })
-    .then((sauce) => {
-      const filename = sauce.imageUrl.split("/images/")[1];
-      fs.unlink(`images/${filename}`, () => {
-        Sauce.deleteOne({ _id: req.params.id })
-          .then(() => res.status(200).json({ message: "Sauce Deleted !" }))
-          .catch((error) => res.status(400).json({ error }));
-      });
-    })
-    .catch((error) => res.status(500).json({ error }));
+    });
+
+    // Changing default error message that is thrown by MongoDB
+
+  } catch (error) {
+    if (error.message.includes("Cast to ObjectId failed for value"))
+      error.message = "Invalid sauce ID";
+
+    res.status(400).json({
+      error: error.message,
+    });
+  }
 };
 
 // Function to like and dislike a sauce
 
 exports.likeSauce = async (req, res) => {
+
   try {
-    const sauce = await Sauce.findOne({ _id: req.params.id });
+
+    // Using the findOne() method to get a sauce by id
+
+    const sauce = await Sauce.findOne({
+      _id: req.params.id,
+    });
+
+    // Validation for liking a sauce
 
     if (!sauce.usersLiked.includes(req.body.userId) && req.body.like === 1) {
       Sauce.updateOne(
-        { _id: req.params.id },
-        { $inc: { likes: 1 }, $push: { usersLiked: req.body.userId } }
-      )
-      .then(() => res.status(200).json({ message: "Sauce liked!" }));
+        {
+          _id: req.params.id,
+        },
+        {
+          $inc: {
+            likes: 1,
+          },
+          $push: {
+            usersLiked: req.body.userId,
+          },
+        }
+      ).then(() =>
+        res.status(200).json({
+          message: "Sauce liked!",
+        })
+      );
 
       return;
     }
+
+    // Validation for unliking a sauce
 
     if (sauce.usersLiked.includes(req.body.userId) && req.body.like === 0) {
       Sauce.updateOne(
-        { _id: req.params.id },
-        { $inc: { likes: -1 }, $pull: { usersLiked: req.body.userId } }
-      ).then(() => res.status(200).json({ message: "Sauce unliked!" }));
+        {
+          _id: req.params.id,
+        },
+        {
+          $inc: {
+            likes: -1,
+          },
+          $pull: {
+            usersLiked: req.body.userId,
+          },
+        }
+      ).then(() =>
+        res.status(200).json({
+          message: "Sauce unliked!",
+        })
+      );
 
       return;
     }
 
+    // Validation for disliking a sauce
     if (
-      !sauce.usersDisliked.includes(req.body.userId) &&
-      req.body.like === -1
-    ) {
+      !sauce.usersDisliked.includes(req.body.userId) && req.body.like === -1
+) {
       Sauce.updateOne(
-        { _id: req.params.id },
-        { $inc: { dislikes: 1 }, $push: { usersDisliked: req.body.userId } }
-      ).then(() => res.status(200).json({ message: "Sauce disliked!" }));
+        {
+          _id: req.params.id,
+        },
+        {
+          $inc: {
+            dislikes: 1,
+          },
+          $push: {
+            usersDisliked: req.body.userId,
+          },
+        }
+      ).then(() =>
+        res.status(200).json({
+          message: "Sauce disliked!",
+        })
+      );
 
       return;
     }
+
+    // Validation for unliking a dislike
+
     if (sauce.userDisliked.includes(req.body.userId) && req.body.like === 0) {
       Sauce.updateOne(
-        { _id: req.params.id },
-        { $inc: { dislikes: -1 }, $pull: { usersDisliked: req.body.userId } }
-      ).then(() => res.status(200).json({ message: "Sauce undislike!" }));
+        {
+          _id: req.params.id,
+        },
+        {
+          $inc: {
+            dislikes: -1,
+          },
+          $pull: {
+            usersDisliked: req.body.userId,
+          },
+        }
+      ).then(() =>
+        res.status(200).json({
+          message: "Sauce undislike!",
+        })
+      );
 
       return;
     } else {

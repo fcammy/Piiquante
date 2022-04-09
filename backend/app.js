@@ -1,9 +1,14 @@
+// Declaring the variables
+
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv  = require('dotenv');
 const cors  = require('cors');
+const morgan = require('morgan')
 
 const path = require('path');
+
+// Declaring routes
 
 const userRoutes = require('./routes/user');
 const sauceRoutes = require('./routes/sauce');
@@ -30,8 +35,9 @@ app.use(express.json());
 
 // function to allow cors 
 app.use(cors());
+app.use(morgan('tiny'))
 
-
+// Allowing the use of static files
 
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
