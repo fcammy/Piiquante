@@ -1,3 +1,4 @@
 backend/.env
-/frontend
+frontend/node_modules/
 backend/images
+node_modules/
